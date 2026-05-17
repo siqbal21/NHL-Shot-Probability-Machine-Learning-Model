@@ -1,0 +1,6 @@
+backend/shots_2023.csv
+shots_2023copy.csv
+models/*.pkl
+__pycache__/
+.ipynb_checkpoints/
+node_modules/
