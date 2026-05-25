@@ -49,9 +49,12 @@ def predict(shot: ShotFeatures):
     shot_types = ['BACK', 'DEFL', 'SLAP', 'SNAP', 'TIP', 'WRAP', 'WRIST']
     shot_type_encoded = {f'shotType_{t}': int(shot.shotType == t) for t in shot_types}
     numeric = [
-        shot.shotDistance, shot.shotAngleAdjusted, shot.shotRebound, shot.offWing,
+        shot.shotDistance, shot.shotAngleAdjusted,
         shot.shootingTeamSkaters, shot.defendingTeamSkaters, shot.period,
         shot.distanceFromLastEvent, shot.scoreDifferential
+    ]
+    binary = [
+        shot.shotRebound, shot.offWing,
     ]
     numeric_scaled = scaler.transform([numeric])[0]
     features = np.array(list(numeric_scaled) + list(shot_type_encoded.values())).reshape(1, -1)
