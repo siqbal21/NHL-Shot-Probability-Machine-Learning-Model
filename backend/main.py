@@ -53,20 +53,9 @@ def predict(shot: ShotFeatures):
         shot.shootingTeamSkaters, shot.defendingTeamSkaters, shot.period,
         shot.distanceFromLastEvent, shot.scoreDifferential
     ]
-    binary = [
-        shot.shotRebound, shot.offWing,
-    ]
+    binary = [shot.shotRebound, shot.offWing]
     numeric_scaled = scaler.transform([numeric])[0]
-    features = np.array(list(numeric_scaled) + list(shot_type_encoded.values())).reshape(1, -1)
+    features = np.array(list(numeric_scaled) + binary + list(shot_type_encoded.values())).reshape(1, -1)
 
     xg = selected_model.predict_proba(features)[0][1]
     return {"xG": float(xg)}
-
-from fastapi.middleware.cors import CORSMiddleware
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
