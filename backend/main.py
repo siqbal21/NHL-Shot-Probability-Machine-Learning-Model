@@ -46,7 +46,7 @@ def predict(shot: ShotFeatures):
     else:
         return {"error": "Invalid model selection"}
 
-    shot_types = ['BACK', 'DEFL', 'SLAP', 'SNAP', 'TIP', 'WRAP', 'WRIST']
+    shot_types = ['BACK', 'DEFL', 'SLAP', 'SNAP', 'TIP', 'WRIST']
     shot_type_encoded = {f'shotType_{t}': int(shot.shotType == t) for t in shot_types}
     numeric = [
         shot.shotDistance, shot.shotAngleAdjusted,
