@@ -3,6 +3,7 @@ import React, {Component} from 'react';
 class HockeyRink extends Component {
     constructor(props) {
         super(props);
+        this.svgRef = React.createRef();
         this.state = {
             // Shot location — derived from click on rink canvas
             shotX: null,
@@ -74,7 +75,7 @@ class HockeyRink extends Component {
     }
 
     fetchPrediction(shotDistance, shotAngleAdjusted) {
-        this.setState({ isLoading: true });
+        this.setState({isLoading: true});
         fetch('http://localhost:8000/predict', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -94,37 +95,39 @@ class HockeyRink extends Component {
         })
             .then(res => res.json())
             .then(data => {
-                this.setState({ xG: data.xG, isLoading: false });
+                this.setState({xG: data.xG, isLoading: false});
             })
             .catch(err => {
                 console.error('Prediction error:', err);
-                this.setState({ isLoading: false });
+                this.setState({isLoading: false});
             });
     }
 
     handleShotTypeChange(event) {
-        this.setState({ shotType: event.target.value }, () => {
+        this.setState({shotType: event.target.value}, () => {
             if (this.state.shotX !== null)
                 this.fetchPrediction(this.state.shotDistance, this.state.shotAngleAdjusted);
         });
     }
 
     handleReboundChange(event) {
-        this.setState({ shotRebound: event.target.checked ? 1 : 0 }, () => {
+        this.setState({shotRebound: event.target.checked ? 1 : 0}, () => {
             if (this.state.shotX !== null)
                 this.fetchPrediction(this.state.shotDistance, this.state.shotAngleAdjusted);
         });
     }
 
     handleOffWingChange(event) {
-        this.setState({ offWing: event.target.checked ? 1 : 0 }, () => {
+        this.setState({offWing: event.target.checked ? 1 : 0}, () => {
             if (this.state.shotX !== null)
                 this.fetchPrediction(this.state.shotDistance, this.state.shotAngleAdjusted);
+            if (this.svgRef.current)
+                this.svgRef.current.style.cursor = 'crosshair';
         });
     }
 
     handlePeriodChange(event) {
-        this.setState({ period: Number(event.target.value) }, () => {
+        this.setState({period: Number(event.target.value)}, () => {
             if (this.state.shotX !== null)
                 this.fetchPrediction(this.state.shotDistance, this.state.shotAngleAdjusted);
         });
@@ -133,7 +136,7 @@ class HockeyRink extends Component {
     handleShootingTeamSkaters(delta) {
         const newVal = this.state.shootingTeamSkaters + delta;
         if (newVal >= 3 && newVal <= 6)
-            this.setState({ shootingTeamSkaters: newVal }, () => {
+            this.setState({shootingTeamSkaters: newVal}, () => {
                 if (this.state.shotX !== null)
                     this.fetchPrediction(this.state.shotDistance, this.state.shotAngleAdjusted);
             });
@@ -142,7 +145,7 @@ class HockeyRink extends Component {
     handleDefendingTeamSkaters(delta) {
         const newVal = this.state.defendingTeamSkaters + delta;
         if (newVal >= 3 && newVal <= 6)
-            this.setState({ defendingTeamSkaters: newVal }, () => {
+            this.setState({defendingTeamSkaters: newVal}, () => {
                 if (this.state.shotX !== null)
                     this.fetchPrediction(this.state.shotDistance, this.state.shotAngleAdjusted);
             });
@@ -150,7 +153,7 @@ class HockeyRink extends Component {
 
     handleScoreDifferential(event) {
         const val = Math.min(5, Math.max(-5, Number(event.target.value)));
-        this.setState({ scoreDifferential: val }, () => {
+        this.setState({scoreDifferential: val}, () => {
             if (this.state.shotX !== null)
                 this.fetchPrediction(this.state.shotDistance, this.state.shotAngleAdjusted);
         });
@@ -158,7 +161,7 @@ class HockeyRink extends Component {
 
     handleDistanceFromLastEvent(event) {
         const val = Math.min(200, Math.max(0, Number(event.target.value)));
-        this.setState({ distanceFromLastEvent: val }, () => {
+        this.setState({distanceFromLastEvent: val}, () => {
             if (this.state.shotX !== null)
                 this.fetchPrediction(this.state.shotDistance, this.state.shotAngleAdjusted);
         });
@@ -166,7 +169,7 @@ class HockeyRink extends Component {
     }
 
     handleModelChange(event) {
-        this.setState({ model: event.target.value }, () => {
+        this.setState({model: event.target.value}, () => {
             if (this.state.shotX !== null) {
                 this.fetchPrediction(this.state.shotDistance, this.state.shotAngleAdjusted);
             }
@@ -177,6 +180,29 @@ class HockeyRink extends Component {
         if (xG < 0.05) return '#e63946';
         if (xG < 0.15) return '#f39c12'
         return '#2ecc71';
+    }
+
+    getCursorImage(rinkY, offWing) {
+        const aboveCenter = rinkY < 0;
+        if (offWing) {
+            return aboveCenter
+                ? {file: 'hockey-stick-righty-offwing.png', x: 50, y: 88}
+                : {file: 'hockey-stick-lefty-offwing.png', x: 50, y: 40};
+        }
+        return aboveCenter
+            ? {file: 'hockey-stick-lefty.png', x: 90, y: 50}
+            : {file: 'hockey-stick-righty.png', x: 90, y: 78};
+    }
+
+    handleMouseMove(event) {
+        const svg = event.currentTarget;
+        const pt = svg.createSVGPoint();
+        pt.x = event.clientX;
+        pt.y = event.clientY;
+        const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+        const rinkPt = this.SVGToRink(svgPt.x, svgPt.y);
+        const {file, x, y} = this.getCursorImage(rinkPt.y, this.state.offWing);
+        svg.style.cursor = `url('/${file}') ${x} ${y}, crosshair`;
     }
 
 
@@ -205,6 +231,8 @@ class HockeyRink extends Component {
         const trapBottom2 = this.rinkToSVG(100, 14);
         const topFaceoffCircle = this.rinkToSVG(69, -22);
         const bottomFaceoffCircle = this.rinkToSVG(69, 22);
+        const topFaceOffDot = this.rinkToSVG(20, -22)
+        const bottomFaceOffDot = this.rinkToSVG(20, 22)
 
         return (
             <g>
@@ -272,10 +300,42 @@ class HockeyRink extends Component {
                     strokeWidth={2}
                 />
                 <circle
+                    cx={topFaceoffCircle.x}
+                    cy={topFaceoffCircle.y}
+                    r={5}
+                    fill="red"
+                    stroke="red"
+                    strokeWidth={2}
+                />
+                <circle
                     cx={bottomFaceoffCircle.x}
                     cy={bottomFaceoffCircle.y}
                     r={120}
                     fill="none"
+                    stroke="red"
+                    strokeWidth={2}
+                />
+                <circle
+                    cx={bottomFaceoffCircle.x}
+                    cy={bottomFaceoffCircle.y}
+                    r={5}
+                    fill="red"
+                    stroke="red"
+                    strokeWidth={2}
+                />
+                <circle
+                    cx={topFaceOffDot.x}
+                    cy={topFaceOffDot.y}
+                    r={5}
+                    fill="red"
+                    stroke="red"
+                    strokeWidth={2}
+                />
+                <circle
+                    cx={bottomFaceOffDot.x}
+                    cy={bottomFaceOffDot.y}
+                    r={5}
+                    fill="red"
                     stroke="red"
                     strokeWidth={2}
                 />
@@ -333,7 +393,7 @@ class HockeyRink extends Component {
 
         return (
             <div style={menuStyle}>
-                <h2 style={{ margin: 0 }}>Shot Menu</h2>
+                <h2 style={{margin: 0}}>Shot Menu</h2>
 
                 {/* Shot Type */}
                 <div>
@@ -359,7 +419,7 @@ class HockeyRink extends Component {
                             type="checkbox"
                             checked={this.state.shotRebound === 1}
                             onChange={(e) => this.handleReboundChange(e)}
-                            style={{ marginRight: '8px' }}
+                            style={{marginRight: '8px'}}
                         />
                         Rebound Shot
                     </label>
@@ -372,9 +432,13 @@ class HockeyRink extends Component {
                             type="checkbox"
                             checked={this.state.offWing === 1}
                             onChange={(e) => this.handleOffWingChange(e)}
-                            style={{ marginRight: '8px' }}
+                            style={{marginRight: '8px'}}
                         />
                         Off Wing
+                        <p style={{fontSize: '11px', color: '#999', margin: '4px 0 0 0'}}>
+                            * Stick orientation is visual only
+                            does not affect xG.
+                        </p>
                     </label>
                 </div>
 
@@ -388,9 +452,9 @@ class HockeyRink extends Component {
                         step={1}
                         value={this.state.period}
                         onChange={(e) => this.handlePeriodChange(e)}
-                        style={{ width: '100%' }}
+                        style={{width: '100%'}}
                     />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '12px'}}>
                         <span>1</span><span>2</span><span>3</span>
                     </div>
                 </div>
@@ -418,17 +482,17 @@ class HockeyRink extends Component {
                 {/* Distance From Last Event */}
                 <div>
                     <label style={labelStyle}>Distance From Last Event (ft)</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px'}}>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                         <input
-                        type="number"
-                        min={0}
-                        max={200}
-                        style={inputStyle}
-                        value={this.state.distanceFromLastEvent}
-                        onChange={(e) => this.handleDistanceFromLastEvent(e)}
+                            type="number"
+                            min={0}
+                            max={200}
+                            style={inputStyle}
+                            value={this.state.distanceFromLastEvent}
+                            onChange={(e) => this.handleDistanceFromLastEvent(e)}
                         />
                         {this.state.distanceFromLastEvent === 60 && (
-                            <span style={{ fontSize: '16px', color: '#888', fontWeight: 'bold'}}>(avg)</span>
+                            <span style={{fontSize: '16px', color: '#888', fontWeight: 'bold'}}>(avg)</span>
                         )}
                     </div>
                 </div>
@@ -462,16 +526,16 @@ class HockeyRink extends Component {
 
                 {/* xG Output */}
                 {this.state.isLoading && (
-                    <div style={{ marginTop: '10px', textAlign: 'center', color: '#888', fontSize: '14px' }}>
+                    <div style={{marginTop: '10px', textAlign: 'center', color: '#888', fontSize: '14px'}}>
                         Calculating...
                     </div>
                 )}
                 {!this.state.isLoading && this.state.xG !== null && (
-                    <div style={{ marginTop: '10px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '14px', fontWeight: 'bold' }}>Expected Goals (xG)</div>
+                    <div style={{marginTop: '10px', textAlign: 'center'}}>
+                        <div style={{fontSize: '14px', fontWeight: 'bold'}}>Expected Goals (xG)</div>
                         {/* Previously: color was always '#e63946' (red)
                             Now uses getXGColor() to reflect danger level */}
-                        <div style={{ fontSize: '48px', fontWeight: 'bold', color: this.getXGColor(this.state.xG) }}>
+                        <div style={{fontSize: '48px', fontWeight: 'bold', color: this.getXGColor(this.state.xG)}}>
                             {(this.state.xG * 100).toFixed(1)}%
                         </div>
                     </div>
@@ -482,26 +546,35 @@ class HockeyRink extends Component {
 
     render() {
         return (
-            <div style={{display: 'flex', flexDirection: 'row', gap: '20px', padding: '20px', height: '100vh', boxSizing: 'border-box'}}>
+            <div style={{
+                display: 'flex',
+                flexDirection: 'row',
+                gap: '20px',
+                padding: '20px',
+                height: '100vh',
+                boxSizing: 'border-box'
+            }}>
                 <div style={{flex: 1, minHeight: 0}}>
-                <svg
-                    viewBox="0 0 800 680"
-                    height="100%"
-                    width="auto"
-                    style={{background: "white", cursor: "crosshair", display: "block"}}
-                    onClick={(e) => this.handleRinkClick(e)}
-                >
-                    {this.renderRink()}
-                    {this.state.shotX && (
-                        <circle
-                            cx={this.rinkToSVG(this.state.shotX, this.state.shotY).x}
-                            cy={this.rinkToSVG(this.state.shotX, this.state.shotY).y}
-                            r={6}
-                            fill="black"
-                            style={{transition: "cx 0.25s ease, cy 0.25s ease"}}
-                        />
-                    )}
-                </svg>
+                    <svg
+                        ref={this.svgRef}
+                        viewBox="0 0 800 680"
+                        height="100%"
+                        width="auto"
+                        style={{background: "white", cursor: "crosshair", display: "block"}}
+                        onClick={(e) => this.handleRinkClick(e)}
+                        onMouseMove={(e) => this.handleMouseMove(e)}
+                    >
+                        {this.renderRink()}
+                        {this.state.shotX && (
+                            <circle
+                                cx={this.rinkToSVG(this.state.shotX, this.state.shotY).x}
+                                cy={this.rinkToSVG(this.state.shotX, this.state.shotY).y}
+                                r={6}
+                                fill="black"
+                                style={{transition: "cx 0.25s ease, cy 0.25s ease"}}
+                            />
+                        )}
+                    </svg>
                 </div>
                 {this.renderMenu()}
             </div>
